@@ -1,0 +1,20 @@
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.96.0
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml
+    ports:
+      - "4317:4317" # OTLP gRPC receiver
+      - "4318:4318" # OTLP HTTP receiver
+    restart: unless-stopped
+
+  signoz:
+    image: signoz/frontend:latest
+    ports:
+      - "3301:3301" # SigNoz UI dashboard
+    environment:
+      - FRONTEND_API_ENDPOINT=http://otel-collector:4318
+    depends_on:
+      - otel-collector
+    restart: unless-stopped

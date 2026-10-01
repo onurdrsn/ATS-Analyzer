@@ -1,0 +1,51 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-ats_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ats_password}
+      POSTGRES_DB: ${POSTGRES_DB:-ats_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ats_user -d ats_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  ats-api:
+    image: ghcr.io/alcatraz/ats-api:latest
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-ats_user}:${POSTGRES_PASSWORD:-ats_password}@postgres:5432/${POSTGRES_DB:-ats_db}
+      - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
+      - RESEND_API_KEY=${RESEND_API_KEY}
+      - ALLOWED_ORIGIN=${ALLOWED_ORIGIN:-http://localhost:5173}
+      - CF_ACCOUNT_ID=${CF_ACCOUNT_ID}
+      - CF_WORKERS_AI_TOKEN=${CF_WORKERS_AI_TOKEN}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL}
+      - ATS_JOB_FETCHER_URL=http://ats-job-fetcher:3001
+
+  ats-job-fetcher:
+    image: ghcr.io/alcatraz/ats-job-fetcher:latest
+    ports:
+      - "3001:3001"
+    environment:
+      - ALLOWED_ORIGIN=http://ats-api:3000 # Only internal API can call
+
+  ats-web:
+    image: ghcr.io/alcatraz/ats-web:latest
+    ports:
+      - "5173:80" # Assuming nginx in the web container
+    environment:
+      - VITE_API_BASE_URL=http://localhost:3000
+
+volumes:
+  postgres_data:
